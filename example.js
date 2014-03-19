@@ -23,7 +23,7 @@
 		
 if (procid != false){
 	console.log("Found process '" + procname + "' with PID:" + procid);
-	//inject dll into the process ID
+	//inject dll into the process ID returns true on success returns false on failure
 	var inj = injector.inject(procid, "C:\dlls\test.dll");
 		if (inj){
 			console.log("Injected process with dll");
