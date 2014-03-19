@@ -1,4 +1,4 @@
-===Building===
+==Building==
 To build this node.js module you will need to use node-gyp https://github.com/TooTallNate/node-gyp
 This module was developed using c++ 2010 if you want to build this module to inject processes with a 64 bit architecture
 you will need to install the 64 bit version of node.js and download windows SDK http://msdn.microsoft.com/en-ca/windows/bb980924.aspx
@@ -10,7 +10,7 @@ It can inject both 32 bit and 64 processes but requires that both the dll and mo
 accept the dll. So... if you want to inject either a 32 bit program or a 64 program it will require you to use either 64-bit nodejs 
 and a 64 bit compiled version of this module or a 32-bit version of node.js and the module.
 
-===How do I use this?===
+==How do I use this?==
 You can see an example here https://github.com/undido/nodeinjector/blob/master/example.js
 
 Basically we first get the process ID of the running program like so:
@@ -27,7 +27,7 @@ After we have gotten the process ID we inject the process by process id
 	//injector.inject will return false on failure it does not know if the program will actually run it will return if it injected the dll but it can't tell if the injected dll will actually run
 	var inj = injector.inject(procid, "C:\dlls\test.dll");
 ```
-===LICENSE===
+==LICENSE==
 	node.js dll injector
     Copyright (C) 2014 undido
 
