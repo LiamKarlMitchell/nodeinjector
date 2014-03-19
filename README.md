@@ -28,8 +28,8 @@ Basically we first get the process ID of the running program like so:
 After we have gotten the process ID we inject the process by process id
 
 
-	/*injector.inject will return false on failure it does not know if the program will actually run it will return if 
-	it injected the dll but it can't tell if the injected dll will actually run */
+	/*injector.inject will return false on failure it does not know if the program will actually 
+	run it will return if it injected the dll but it can't tell if the injected dll will actually run */
 	var inj = injector.inject(procid, "C:\dlls\test.dll");
 
 LICENSE
