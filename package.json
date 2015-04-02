@@ -1,0 +1,32 @@
+{
+  "name": "nodeinjector",
+  "version": "1.0.0",
+  "description": "Enables node.js to inject DLL into a process on Windows.",
+  "author": "Undido (https://github.com/undido)",
+  "contributors": [{
+    "name": "Liam Mitchell",
+    "email": "liamkarlmitchell@gmail.com"
+  }],
+  "main": "./build/Release/injector",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/undido/nodeinjector"
+  },
+  "keywords": [
+    "InjectDLL",
+    "Windows DLL Injection"
+  ],
+  "license": "GNU GPL v3.0",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/undido/nodeinjector/issues"
+  },
+  "homepage": "https://github.com/undido/nodeinjector",
+  "engine": ">=0.12.0",
+  "os": [ "win32" ],
+  "cpu": [ "x64", "ia32" ]
+}

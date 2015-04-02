@@ -4,6 +4,17 @@ To build this node.js module you will need to use node-gyp https://github.com/To
 This module was developed using c++ 2010 if you want to build this module to inject processes with a 64 bit architecture
 you will need to install the 64 bit version of node.js and download windows SDK http://msdn.microsoft.com/en-ca/windows/bb980924.aspx
 
+If building for node-webkit look at their guide https://github.com/nwjs/nw-gyp
+
+I had to do this
+
+```
+nw-gyp configure --target=v0.12.0 --msvs_version=2012
+nw-gyp build --arch=ia32
+```
+
+Compiled on Windows 7 x64 as a 32bit binary.
+
 
 What can this be used for?
 ===================
@@ -14,7 +25,7 @@ and a 64 bit compiled version of this module or a 32-bit version of node.js and 
 
 How do I use this?
 ===================
-You can see an example here https://github.com/undido/nodeinjector/blob/master/example.js
+For an example see example.js
 
 Basically we first get the process ID of the running program like so:
 

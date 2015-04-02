@@ -22,14 +22,12 @@
 #include <string>
 #include <cstdio>
 #include <tlhelp32.h>
+#include <iostream>
 
 using namespace v8;
 
-
-
 void EnableDebugPriv()
 {
-
     HANDLE hToken;
     LUID luid;
     TOKEN_PRIVILEGES tkp;
@@ -46,100 +44,167 @@ void EnableDebugPriv()
     CloseHandle(hToken); 
 }
 
-Handle<Value> injectProc(const Arguments& args) {
-HandleScope scope;
-	//Declare the handle of the process.
-HANDLE Process;
+bool injectDLL(DWORD dwProcessId, LPCSTR lpszDLLPath)
+{
+  HANDLE  hProcess, hThread;
+  LPVOID  lpBaseAddr, lpFuncAddr;
+  DWORD   dwMemSize, dwExitCode;
+  BOOL    bSuccess = false;
+  HMODULE hUserDLL;
 
-//Declare the memory we will be allocating
-LPVOID Memory;
-
-//Declare LoadLibrary
-LPVOID LoadLibrary; 
- EnableDebugPriv();
-	//v8 to std::string
-    v8::String::Utf8Value procid4(args[0]->ToString());
-    std::string procid3 = std::string(*procid4);   
-	//string to int
-	int procid2 = atoi(procid3.c_str());
-	//int to dword...
-	DWORD PID = (DWORD)procid2;
-	
-	v8::String::Utf8Value dllName3(args[1]->ToString());
-    std::string dllName2 = std::string(*dllName3);  
-	const char * dll = dllName2.c_str();
-
-
-if(!PID) {
-  return scope.Close(False());
-   }
-    
-  //Open the process with read , write and execute priviledges
-   Process = OpenProcess(PROCESS_CREATE_THREAD|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|PROCESS_VM_WRITE|PROCESS_VM_OPERATION, FALSE, PID);
-  
-   //Get the address of LoadLibraryA
-   LoadLibrary = (LPVOID)GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
-  
-   // Allocate space in the process for our DLL
-   Memory = (LPVOID)VirtualAllocEx(Process, NULL, strlen(dll)+1, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-  
-   // Write the string name of our DLL in the memory allocated
-   WriteProcessMemory(Process, (LPVOID)Memory, (void *)dll, strlen(dll)+1, NULL);
-  
-   // Load our DLL, by forcing the process to call LoadLibrary("mydll.dll");
-   CreateRemoteThread(Process, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibrary, (LPVOID)Memory, NULL, NULL);
-  
-   //Let the program regain control of itself
-   CloseHandle(Process);
-
-
-  //Lets free the memory we are not using anymore.
-   VirtualFreeEx(Process , (LPVOID)Memory , 0, MEM_RELEASE);
-
-  return scope.Close(True());
+  if((hProcess = OpenProcess(PROCESS_CREATE_THREAD|PROCESS_QUERY_INFORMATION|PROCESS_VM_OPERATION
+    |PROCESS_VM_WRITE|PROCESS_VM_READ|THREAD_QUERY_INFORMATION, FALSE, dwProcessId)))
+  {   
+    dwMemSize = lstrlenA(lpszDLLPath) + 1;
+    if((lpBaseAddr = VirtualAllocEx(hProcess, NULL, dwMemSize, MEM_COMMIT, PAGE_READWRITE)))
+    {     
+      if(WriteProcessMemory(hProcess, lpBaseAddr, lpszDLLPath, dwMemSize, NULL))
+      { 
+        hUserDLL = LoadLibrary(TEXT("kernel32.dll"));
+        if (hUserDLL == NULL) {
+          hUserDLL = LoadLibrary(TEXT("kernelbase.dll"));
+        }
+        if(hUserDLL)
+        {         
+          if((lpFuncAddr = GetProcAddress(hUserDLL, "LoadLibraryA")))
+          {           
+            if((hThread = CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)lpFuncAddr, lpBaseAddr, 0, NULL)))
+            {
+              WaitForSingleObject(hThread, INFINITE);
+              if(GetExitCodeThread(hThread, &dwExitCode)) {
+                bSuccess = (dwExitCode != 0) ? true : false;
+              }
+              CloseHandle(hThread);
+            }
+          }
+          FreeLibrary(hUserDLL);
+        }
+      }
+      VirtualFreeEx(hProcess, lpBaseAddr, 0, MEM_RELEASE);
+    }
+    CloseHandle(hProcess);
+  }
+  return bSuccess;
 }
 
-Handle<Value> getprocID(const Arguments& args) {
-HandleScope scope;
-    v8::String::Utf8Value procn(args[0]->ToString());
-    std::string y2 = std::string(*procn);  
+void injectProc(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+
+ if (args.Length() < 1) {
+    isolate->ThrowException(Exception::TypeError(
+        String::NewFromUtf8(isolate, "Wrong number of arguments. Expects Process ID and string DLL path.")));
+    return;
+  }
+
+  if (!args[0]->IsNumber()) {
+    isolate->ThrowException(Exception::TypeError(
+        String::NewFromUtf8(isolate, "Wrong arguments. Process ID should be a number.")));
+    return;
+  }
+
+  EnableDebugPriv();
+  //v8 to std::string
+  String::Utf8Value procid4(args[0]->ToString());
+  std::string procid3 = std::string(*procid4);   
+  //string to int
+  int procid2 = atoi(procid3.c_str());
+  //int to dword...
+  DWORD PID = (DWORD)procid2;
+	
+  String::Utf8Value dllName3(args[1]->ToString());
+  std::string dllName2 = std::string(*dllName3);  
+  const char * dll = dllName2.c_str();
+
+  if(!PID) {
+    return args.GetReturnValue().Set(false);
+  }
+
+  if (injectDLL(PID, dll)) {
+    return args.GetReturnValue().Set(true);
+  }
+
+  return args.GetReturnValue().Set(false);
+}
+
+void getprocID(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+
+   if (args.Length() < 1) {
+    isolate->ThrowException(Exception::TypeError(
+        String::NewFromUtf8(isolate, "Wrong number of arguments. Expects string 'Process Name'.")));
+    return;
+  }
+
+  v8::String::Utf8Value procn(args[0]->ToString());
+  std::string y2 = std::string(*procn);  
 	const char * procname = y2.c_str();
 	
-	 EnableDebugPriv();
+	EnableDebugPriv();
 
-    PROCESSENTRY32 entry;
-    entry.dwSize = sizeof(PROCESSENTRY32);
+  PROCESSENTRY32 entry;
+  entry.dwSize = sizeof(PROCESSENTRY32);
 
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+  HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
 
-    if (Process32First(snapshot, &entry) == TRUE)
-    {
-        while (Process32Next(snapshot, &entry) == TRUE)
-        {
-            if (stricmp(entry.szExeFile, procname) == 0)
-            {  
-			
-			 return scope.Close(Integer::New(entry.th32ProcessID));
-                 CloseHandle(snapshot);
-            }
-        }
-    }
-  return scope.Close(False());
-    CloseHandle(snapshot);
+  if (Process32First(snapshot, &entry) == TRUE)
+  {
+      while (Process32Next(snapshot, &entry) == TRUE)
+      {
+          if (stricmp(entry.szExeFile, procname) == 0)
+          {
+             CloseHandle(snapshot);
+		     return args.GetReturnValue().Set(false);
+          }
+      }
+  }
+  CloseHandle(snapshot);
+  return args.GetReturnValue().Set(false);
 }
 
+void executeInject(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  
+ if (args.Length() < 2) {
+    isolate->ThrowException(Exception::TypeError(
+        String::NewFromUtf8(isolate, "Wrong number of arguments. Expects string 'executablefile & arguments' and string 'dllpath'.")));
+    return;
+  }
 
+  std::string launchString(*v8::String::Utf8Value(args[0]->ToString()));
+  std::string dllPath(*v8::String::Utf8Value(args[1]->ToString()));
 
+  EnableDebugPriv();
+
+  PROCESSENTRY32 entry;
+  entry.dwSize = sizeof(PROCESSENTRY32);
+
+  PROCESS_INFORMATION processInfo;
+  STARTUPINFO info={sizeof(info)};
+
+  if(CreateProcessA(NULL,(LPSTR)launchString.c_str(), NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &info, &processInfo))
+  {
+	  if (injectDLL(processInfo.dwProcessId, dllPath.c_str()  )) {
+      if (ResumeThread((HANDLE)processInfo.hThread) != -1) {
+		   return args.GetReturnValue().Set(true);
+	     }
+    }
+
+    // If we get here then there was a problem injecting the dll.
+    // Kill process to prevent leaving a suspended process hanging around.
+    TerminateProcess(processInfo.hProcess,1);
+  }
+
+  return args.GetReturnValue().Set(false);
+}
 
 
 void init(Handle<Object> exports) {
-	  //get process id
-	  	    exports->Set(String::NewSymbol("getprocID"),
-      FunctionTemplate::New(getprocID)->GetFunction());
-	  //inject process
-	  	  	    exports->Set(String::NewSymbol("inject"),
-      FunctionTemplate::New(injectProc)->GetFunction());
-	 
+	NODE_SET_METHOD(exports, "getprocID", getprocID);
+	NODE_SET_METHOD(exports, "inject", injectProc);
+	NODE_SET_METHOD(exports, "executeInject", executeInject);
 }
 
 NODE_MODULE(injector, init)
