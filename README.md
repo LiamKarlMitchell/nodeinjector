@@ -43,6 +43,12 @@ After we have gotten the process ID we inject the process by process id
 	run it will return if it injected the dll but it can't tell if the injected dll will actually run */
 	var inj = injector.inject(procid, "C:\dlls\test.dll");
 
+
+Create a process and inject a dll into it
+```
+injector.executeInject("Process.exe /Arguments....","DLLName");
+```
+
 LICENSE
 ===================
 	node.js dll injector
